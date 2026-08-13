@@ -48,10 +48,13 @@ jobs:
 
       - uses: astral-sh/setup-uv@v5
 
+      # checkout fetches submodules shallow and without tags, so describe has
+      # nothing to name the commit with. The pin itself is what matters.
       - name: Engine pin
         run: |
-          git -C engine describe --tags
           git submodule status
+          git -C engine describe --tags 2>/dev/null \
+            || echo "pinned at $(git -C engine rev-parse HEAD)"
 
       - run: make lint
       - run: make check
