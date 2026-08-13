@@ -98,7 +98,9 @@ if git -C "$ROOT" rev-parse --git-dir >/dev/null 2>&1 && git -C "$ROOT" rev-pars
     [[ -e "$alternates" ]] && skip_gc=1
 
     # Whether origin belongs to the template or to the author decides whether
-    # removing it is a favour or a theft. The URL says; the commit count does not.
+    # dropping the remotes is a favour or a theft. The URL says; the commit
+    # count does not. The decision is made from origin, and applied to every
+    # remote, since they all came with the template's clone.
     origin_url=$(git -C "$ROOT" remote get-url origin 2>/dev/null || true)
     case "$origin_url" in
         *paper-template*) drop_origin=1 ;;
@@ -195,6 +197,21 @@ build:
     references: ~
 YAML
 
+# The clone line names a real repository when one is known. When init has just
+# dropped the template's remote, this paper has no URL yet, and inventing one
+# would be worse than saying so.
+if [[ $drop_origin -eq 0 && -n "${origin_url:-}" ]]; then
+    clone_block="\`\`\`sh
+git clone --recurse-submodules $origin_url
+\`\`\`"
+else
+    clone_block="This paper has no remote yet. Once it does, co-authors clone it with:
+
+\`\`\`sh
+git clone --recurse-submodules <this paper's repository URL>
+\`\`\`"
+fi
+
 # The title is printed, not interpolated: an unquoted heredoc would execute a
 # backtick and substitute a $ in someone's title.
 {
@@ -207,6 +224,18 @@ Prose lives in `main.md`. Everything after the `{#sec:supp}` heading is suppleme
 
 Metadata — title, authors, affiliations, target journal, citation style — lives in `paper.yml`, and nowhere else.
 
+| To write | Use |
+|---|---|
+| a citation | `[@key]`, `[@one; @two]`, or `@key` in text |
+| a figure | `![Caption.](figures/flow.png){#fig:flow}`, referenced as `@fig:flow` |
+| a table | a `::: {#tbl:baseline}` div holding the caption, referenced as `@tbl:baseline` |
+| the supplement boundary | `# Supplementary Material {#sec:supp}` |
+| a checklist anchor | `{.checklist-strobe-4}` on a heading, or a `::: {.checklist-record-6}` div — any instrument |
+| a Word paragraph style | `::: {.style-abstract}` |
+| a note to a co-author | `[text]{.coauthor-comment author="AL" date="2026-08-12"}` — highlighted in every output, never mistakable for prose |
+
+Figures go in `figures/`, tables in `tables/`, produced by whatever makes your tables. Neither is authored inline. Numbering is automatic: main items are `Figure 1`, supplementary items are `Figure S1`, and a reference from the main text to a supplementary figure resolves because both builds see the whole manuscript.
+
 ## Building
 
 ```sh
@@ -215,6 +244,8 @@ make pdf        # main.pdf via Typst
 make bib        # refresh references.bib from Zotero
 make submit     # journal-ready bundle
 make check      # confirm the engine still produces the same documents
+make lint       # yamllint over paper.yml
+make clean      # remove build/
 ```
 
 Outputs land in `build/`, which is not tracked.
@@ -227,11 +258,11 @@ Outputs land in `build/`, which is not tracked.
 
 `engine/` is a git submodule holding the build machinery, pinned to one tagged release. It is not part of this repository beyond the commit it points at, so this paper builds the same way in five years as it does today.
 
-**Co-authors clone with submodules**, or `engine/` arrives empty and every target fails:
+**Co-authors clone with submodules**, or `engine/` arrives empty and every target that needs it refuses to run:
 
-```sh
-git clone --recurse-submodules <this repository> && cd <it>
-```
+MARKDOWN
+    printf '%s\n' "$clone_block"
+    cat <<'MARKDOWN'
 
 Someone who has already cloned without it can run `git submodule update --init`.
 
@@ -264,9 +295,9 @@ rm -f "$tmp"
 
 rm -rf "$ROOT/CLAUDE.md" "$ROOT/.claude" "$ROOT/CHANGELOG.md"
 
-# Last, and never engine/init-paper.sh: deleting a file the engine tracks would
-# leave the submodule permanently modified. Bash keeps reading this script
-# through its open descriptor after the unlink.
+# Last, and never anything under engine/: deleting a file the engine tracks
+# would leave the submodule permanently modified in every clone. Bash keeps
+# reading this script through its open descriptor after the unlink.
 rm -rf "$ROOT/.template"
 
 echo
@@ -339,7 +370,7 @@ if [[ $in_git -eq 1 ]]; then
         fi
 
         echo "  replaced the template's history with one commit"
-        [[ $drop_origin -eq 1 ]] && echo "  removed  origin — it pointed at the template"
+        [[ $drop_origin -eq 1 ]] && echo "  removed  the template's remotes — origin pointed at the template"
     else
         echo "  kept the existing history"
         echo

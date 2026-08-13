@@ -71,6 +71,8 @@ git clone --recurse-submodules . /tmp/t2 && make -C /tmp/t2 docx             # a
 
 The third one is load-bearing: exactly one commit object in the whole store. The engine's commits live in `.git/modules/engine/objects`, a separate store, so they do not count.
 
-Init refuses, before touching anything, on: a detached HEAD, an uninitialised `engine/`, an `engine/` that is populated but not a repository, an engine pinned to a commit on no remote branch or tag, no configured `user.email`, and a journal key or citation style that names no file in the engine. Each deserves its own clone and a `git status --porcelain` that comes back empty.
+Init refuses, before touching anything, on: no `Makefile` at the root, an uninitialised `engine/`, an `engine/` that is populated but not a repository, an engine pinned to a commit on no remote branch or tag, a `user.email` that only exists because git synthesised one from the hostname, a branch named `__paper_init` already existing, and a journal key or citation style that names no file in the engine. Each deserves its own clone and a `git status --porcelain` that comes back empty.
+
+A detached HEAD is **not** a refusal. It is survived: `symbolic-ref --quiet` plus a fallback branch name is exactly what stops `set -e` killing the script there, and `git branch -M` then creates the branch that did not exist. Test it too — it is the path that used to abort after the filesystem had already been rewritten.
 
 The commit itself is the last recoverable point. If it fails — a signing key that is not available, a hook — the ERR trap prints `git checkout -f <branch>`, which restores every file init wrote or deleted, `.template/` included.

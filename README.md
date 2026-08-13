@@ -12,9 +12,9 @@ cd my-paper
 make init
 ```
 
-`--recurse-submodules` matters: the build machinery is a submodule, and without it `engine/` arrives empty. Every target says so rather than failing obscurely, and `git submodule update --init` fixes it.
+`--recurse-submodules` matters: the build machinery is a submodule, and without it `engine/` arrives empty. Every target that needs the engine says so rather than failing obscurely — `make help` and `make clean` do not need it and still work — and `git submodule update --init` fixes it.
 
-`make init` asks for the title, the first author and the target journal, writes `paper.yml`, replaces this README with one about your paper, and removes the scaffolding that exists only to develop the template. It then offers to replace the template's commit history with a single commit for your paper. From then on the repo is your paper.
+`make init` asks nine questions — title, short title, first author with email and ORCID, affiliation, target journal, citation style, Zotero collection — then writes `paper.yml`, replaces this README with one about your paper, and removes the scaffolding that exists only to develop the template. It then offers to replace the template's commit history with a single commit for your paper. From then on the repo is your paper.
 
 ## Write
 
@@ -34,7 +34,7 @@ The authoring conventions are all visible in the `main.md` you start with:
 | a Word paragraph style | `::: {.style-abstract}` |
 | a note to a co-author | `[text]{.coauthor-comment author="AL" date="2026-08-12"}` — highlighted in every output, never mistakable for prose |
 
-Figures are files you drop in `figures/`. Tables are files you drop in `tables/`, produced by whatever makes your tables. Neither is authored inline.
+Figures are files you drop in `figures/`. Tables are files you drop in `tables/`, produced by whatever makes your tables. Neither is authored inline. The two shipped figures are one-pixel placeholders so a fresh clone builds; replace them.
 
 Numbering is automatic and consistent across both documents: main items are `Figure 1`, supplementary items are `Figure S1`, and a reference from the main text to a supplementary figure resolves correctly because both builds see the whole manuscript.
 
@@ -60,7 +60,7 @@ Everything in `build/` is reproducible from `main.md` and `paper.yml`, so none o
 
 ```yaml
 build:
-  zotero-collection: "Projects/Postdocs/Bladder"
+  zotero-collection: "Projects/Bladder/Incidence"
 ```
 
 ## Revision, and the Word problem
@@ -138,4 +138,4 @@ engine/            the machinery, as a pinned submodule
 
 This scaffolding carries no licence of its own — what you write is yours, and the starting files are yours to relicense or delete. `engine/` is licensed separately; see `engine/LICENSE`.
 
-This template was built with [Claude Code](https://claude.com/claude-code), which wrote much of it under review. That applies to the tool, not to anything you write with it: nothing in a built manuscript, a PDF or a submission bundle records how the tool was made, and `make init` removes this file along with the rest of the template's scaffolding.
+This template was built with [Claude Code](https://claude.com/claude-code), which wrote much of it under review. That applies to the tool, not to anything you write with it: nothing in a built manuscript, a PDF or a submission bundle records how the tool was made, and `make init` replaces this file with one about your paper.

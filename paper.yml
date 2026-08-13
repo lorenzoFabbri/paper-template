@@ -31,10 +31,10 @@ author:
   - name: Charles Babbage
     institute: [inst1, inst2]
     equal_contributor: true
-    orcid: 0000-0001-5109-3700
+    orcid: 0000-0001-9999-000X
   - name: Grace Hopper
     institute: [inst2]
-    orcid: 0000-0003-1527-0030
+    orcid: 0000-0003-9999-0000
 
 # Institute keys: `id`, referenced by authors above, and `name`. The numeric
 # superscript index is assigned in declaration order.
