@@ -3,6 +3,7 @@ name: check
 on:
   push:
   pull_request:
+  workflow_dispatch:
 
 jobs:
   # The paper as a co-author receives it: cloned with submodules, built end to
