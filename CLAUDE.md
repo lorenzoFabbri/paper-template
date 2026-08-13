@@ -6,6 +6,8 @@ This file is for developing the template. `make init` deletes it, so a paper clo
 
 A paper template. The repository root is the paper — `main.md`, `paper.yml`, `references.bib`, `figures/`, `tables/` — and `engine/` is [manuscript-engine](https://github.com/lorenzoFabbri/manuscript-engine) as a git submodule, pinned to a tagged release. Someone clones this with `--recurse-submodules`, runs `make init`, and writes.
 
+What ships is a skeleton, not a worked example: `main.md` is headings and the supplement marker, `figures/`, `tables/` and `checklists/` are empty, and `references.bib` has no entries. Nothing invented, so nothing invented can survive into a submission bundle. The authoring syntax is documented in `README.md`, and `.template/init-paper.sh` copies that table into the README it writes — which is the only reason a paper still has it after init.
+
 Two properties are the point of the whole thing, and changes that weaken either are not worth making:
 
 **`paper.yml` is the only file a paper edits.** If a new setting appears, it goes in `paper.yml`, read by the Makefile with `yq` and handed to pandoc as `--metadata-file`. Do not add a Make variable, an environment variable or a second config file.
@@ -19,6 +21,7 @@ Everything under `engine/` belongs to the other repository. This one cannot comm
 - **Never write to `engine/`.** A build writing an unignored file inside it leaves the submodule dirty in every paper. `make check` writes only to `engine/tests/papers/*/build/`, which the engine's own `.gitignore` covers.
 - **Never delete a file the engine tracks.** That is why `init-paper.sh` lives here, in `.template/`, and deletes itself rather than something in `engine/`.
 - **`make check-regenerate` is not a target here.** Recording goldens rewrites files the engine owns; it belongs in the engine's own Makefile, where the filter change and the regenerated golden land in one commit.
+- **Nothing in this repository may need a pip install.** The engine reads YAML through `yq` and imports only the standard library, so a paper survives an interpreter upgrade that empties site-packages. Do not add a dependency that would undo that.
 - **A pipeline or filter change belongs in the engine**, followed by a release there and a submodule bump here.
 
 Bumping the pin is three commands, and the tag it lands on must exist on the engine's remote — a pin nobody can fetch is a paper nobody can clone:
@@ -32,9 +35,11 @@ git add engine && git commit -m "Engine $(git -C engine describe --tags)"
 ## Before committing
 
 ```sh
-make lint    # shellcheck over .template/init-paper.sh, yamllint over paper.yml
+make lint    # shellcheck over .template/init-paper.sh, yamllint over paper.yml and the workflows
 make check   # build the engine's four test papers and check them against their sources
 ```
+
+Both linters are pinned. Unpinned, `uvx` resolves to whatever is newest, and the same tree starts passing here and failing in CI as default rule sets grow.
 
 `make check` takes about ten seconds and builds twelve documents. It is the engine's suite, run through the pinned engine, so it also tells you whether a bump changed anything.
 
@@ -71,7 +76,11 @@ git clone --recurse-submodules . /tmp/t2 && make -C /tmp/t2 docx             # a
 
 The third one is load-bearing: exactly one commit object in the whole store. The engine's commits live in `.git/modules/engine/objects`, a separate store, so they do not count.
 
-Init refuses, before touching anything, on: no `Makefile` at the root, an uninitialised `engine/`, an `engine/` that is populated but not a repository, an engine pinned to a commit on no remote branch or tag, a `user.email` that only exists because git synthesised one from the hostname, a branch named `__paper_init` already existing, and a journal key or citation style that names no file in the engine. Each deserves its own clone and a `git status --porcelain` that comes back empty.
+Init refuses, before touching anything, on: no `Makefile` at the root, an uninitialised `engine/`, an `engine/` that is populated but not a repository, an engine pinned to a commit on no remote branch or tag, a `user.email` that only exists because git synthesised one from the hostname, a branch named `__paper_init` already existing, **any ref besides the current branch — another branch, a tag, a stash**, **a dirty working tree**, and a journal key or citation style that names no file in the engine. Each deserves its own clone and a `git status --porcelain` that comes back empty.
+
+The ref check is the one that matters most. Replacing the history deletes every ref, so a stash or a branch the author made would go with the template's, and this script has no way to weigh what that work is worth. It refuses instead.
+
+The sweep uses `grep -vxF`, not `for-each-ref --exclude`, which needs git 2.42 — newer than Debian 12 or Ubuntu 22.04 ship. Test on an old git by putting a shim on `PATH` that exits 129 for `--exclude`; init must still finish, leaving one commit and no stray refs.
 
 A detached HEAD is **not** a refusal. It is survived: `symbolic-ref --quiet` plus a fallback branch name is exactly what stops `set -e` killing the script there, and `git branch -M` then creates the branch that did not exist. Test it too — it is the path that used to abort after the filesystem had already been rewritten.
 

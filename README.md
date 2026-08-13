@@ -20,9 +20,9 @@ make init
 
 Prose lives in `main.md`. Everything after the `{#sec:supp}` heading is supplementary material and becomes its own document at build time.
 
-Metadata lives in `paper.yml` and nowhere else: title, authors, affiliations, ORCIDs, target journal, citation style, Zotero collection. There is no second place to change the title.
+Metadata lives in `paper.yml` and nowhere else: title, authors, affiliations, ORCIDs, target journal, citation style, Zotero collection. Change the title there and every output follows.
 
-The authoring conventions are all visible in the `main.md` you start with:
+`main.md` starts as section headings and the supplement marker, and nothing else — no worked example to delete, and no invented numbers that could reach a submission bundle by being forgotten. This table is where the syntax lives, and `make init` carries it into the README it writes for your paper:
 
 | To write | Use |
 |---|---|
@@ -34,7 +34,7 @@ The authoring conventions are all visible in the `main.md` you start with:
 | a Word paragraph style | `::: {.style-abstract}` |
 | a note to a co-author | `[text]{.coauthor-comment author="AL" date="2026-08-12"}` — highlighted in every output, never mistakable for prose |
 
-Figures are files you drop in `figures/`. Tables are files you drop in `tables/`, produced by whatever makes your tables. Neither is authored inline. The two shipped figures are one-pixel placeholders so a fresh clone builds; replace them.
+Figures are files you drop in `figures/`. Tables are files you drop in `tables/`, produced by whatever makes your tables. Neither is authored inline, and both directories start empty.
 
 Numbering is automatic and consistent across both documents: main items are `Figure 1`, supplementary items are `Figure S1`, and a reference from the main text to a supplementary figure resolves correctly because both builds see the whole manuscript.
 
@@ -45,8 +45,8 @@ make docx       # build/main.docx and build/supplement.docx
 make pdf        # build/main.pdf, double-spaced and line-numbered for review
 make bib        # refresh references.bib from your Zotero collection
 make submit     # a journal-ready bundle for the journal in paper.yml
-make check      # the engine still produces the same documents
-make lint       # yamllint over paper.yml
+make check      # build the engine's four test papers, checked against their sources
+make lint       # yamllint over paper.yml, and shellcheck while the scaffolding is here
 make clean      # remove build/
 ```
 
@@ -103,7 +103,7 @@ build:
 
 ## The engine
 
-`engine/` is [manuscript-engine](https://github.com/lorenzoFabbri/manuscript-engine), carried as a git submodule and pinned to one tagged release. Pinning is the point: a paper builds the same way in five years as it does today, and a change to the engine cannot reach a paper that did not ask for it.
+`engine/` is [manuscript-engine](https://github.com/lorenzoFabbri/manuscript-engine), carried as a git submodule and pinned to one tagged release. Pinning is the point: a change to the engine cannot reach a paper that did not ask for it. It fixes the engine, not the pandoc around it — `make check` is what tells you whether your toolchain has moved under you.
 
 To ask for it:
 
@@ -115,11 +115,13 @@ git add engine && git commit -m "Engine $(git -C engine describe --tags)"
 
 That follows the engine's `release` branch, which only ever points at a tagged release, so a bump never lands on unreleased work. `engine/CHANGELOG.md` says what changed, and `make check` builds the engine's own four test papers and checks each against its manuscript — which is how you find out whether your output would move.
 
+On the receiving end, a plain `git pull` leaves the old engine checked out and the paper still builds against it, silently. After any pull that moves the pin, run `git submodule update --init --recursive`. A later `git add -A` with a stale engine would quietly commit the pin backwards.
+
 No build reaches the network or checks for updates. `make docx-live` and `make bib` talk to Zotero on `127.0.0.1:23119` and are the only exceptions; both fail with a clear message when it is not running.
 
 ## Requirements
 
-`pandoc`, `pandoc-crossref`, `yq`, `typst` for `make pdf`, and `python3` with PyYAML for `make submit`. `make lint` uses `uvx`. `make docx-live` and `make bib` need Zotero with Better BibTeX.
+`pandoc`, `pandoc-crossref`, [`yq`](https://github.com/mikefarah/yq) (mikefarah's, v4 — Debian and Ubuntu ship a different program under that name), `typst` for `make pdf`, `pdftotext` from poppler, `unzip`, `curl`, and `python3`. Nothing needs installing with pip. `make lint` uses `uvx`, which fetches its linters from PyPI and is the one command here that reaches the network. `make docx-live` and `make bib` need Zotero with Better BibTeX.
 
 The engine records the pandoc and pandoc-crossref versions it was tested against; see `engine/README.md`.
 
@@ -128,14 +130,15 @@ The engine records the pandoc and pandoc-crossref versions it was tested against
 ```
 paper.yml          the only file you edit for a new paper
 main.md            prose, main text and supplement
-references.bib
-figures/ tables/ checklists/
+references.bib     empty until `make bib`, or maintained by hand
+figures/ tables/ checklists/   empty; drop your files in
 build/             outputs, untracked
 engine/            the machinery, as a pinned submodule
+LICENSE            CC0, for the scaffolding only
 ```
 
 ## Licence
 
-This scaffolding carries no licence of its own — what you write is yours, and the starting files are yours to relicense or delete. `engine/` is licensed separately; see `engine/LICENSE`.
+The scaffolding — `main.md`, `paper.yml`, the `Makefile`, `.template/` — is CC0: public domain, no attribution, yours to relicense or delete. See `LICENSE`. What you write with it was never covered by anything. `engine/` is a separate repository under its own licence; see `engine/LICENSE`.
 
 This template was built with [Claude Code](https://claude.com/claude-code), which wrote much of it under review. That applies to the tool, not to anything you write with it: nothing in a built manuscript, a PDF or a submission bundle records how the tool was made, and `make init` replaces this file with one about your paper.

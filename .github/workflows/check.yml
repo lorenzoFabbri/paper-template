@@ -1,0 +1,103 @@
+name: check
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  # The paper as a co-author receives it: cloned with submodules, built end to
+  # end on a machine that is not the author's.
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install pandoc and pandoc-crossref
+        run: |
+          set -euo pipefail
+          curl -fsSL -o pandoc.deb \
+            https://github.com/jgm/pandoc/releases/download/3.10.1/pandoc-3.10.1-1-amd64.deb
+          sudo dpkg -i pandoc.deb
+          curl -fsSL -o crossref.tar.xz \
+            https://github.com/lierdakil/pandoc-crossref/releases/download/v0.3.25/pandoc-crossref-Linux-X64.tar.xz
+          tar -xJf crossref.tar.xz pandoc-crossref
+          sudo install -m 0755 pandoc-crossref /usr/local/bin/pandoc-crossref
+
+      # Not `apt install yq`: that is a different program, and the engine
+      # refuses it by name.
+      - name: Install mikefarah/yq
+        run: |
+          set -euo pipefail
+          sudo curl -fsSL -o /usr/local/bin/yq \
+            https://github.com/mikefarah/yq/releases/download/v4.44.3/yq_linux_amd64
+          sudo chmod 0755 /usr/local/bin/yq
+
+      - name: Install typst
+        run: |
+          set -euo pipefail
+          curl -fsSL -o typst.tar.xz \
+            https://github.com/typst/typst/releases/download/v0.15.1/typst-x86_64-unknown-linux-musl.tar.xz
+          tar -xJf typst.tar.xz --strip-components=1 typst-x86_64-unknown-linux-musl/typst
+          sudo install -m 0755 typst /usr/local/bin/typst
+
+      - name: Install poppler-utils
+        run: sudo apt-get install -y --no-install-recommends poppler-utils
+
+      - uses: astral-sh/setup-uv@v5
+
+      - name: Engine pin
+        run: |
+          git -C engine describe --tags
+          git submodule status
+
+      - run: make lint
+      - run: make check
+      - run: make docx
+      - run: make pdf
+      - run: make submit
+
+      - name: The skeleton carries nothing invented
+        run: |
+          set -euo pipefail
+          if grep -rIn -E 'Lovelace|Babbage|Hopper|Example University|95% CI' \
+               --include='*.md' --include='*.yml' --include='*.bib' . \
+               | grep -v '^\./engine/' | grep -v '^engine/'; then
+            echo "example content reached the template" >&2
+            exit 1
+          fi
+          echo "no invented content outside engine/"
+
+  # Cloning without --recurse-submodules is the mistake a first-time user
+  # makes, and every target that needs the engine has to say so rather than
+  # failing with "No such file or directory".
+  without-submodules:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Every engine-dependent target refuses, clearly
+        run: |
+          set -euo pipefail
+          for t in docx pdf submit bib check lint init; do
+            if out=$(make "$t" 2>&1); then
+              echo "make $t succeeded with an empty engine/" >&2; exit 1
+            fi
+            grep -q 'engine/ is empty' <<<"$out" || {
+              echo "make $t failed without naming the submodule:" >&2
+              echo "$out" >&2; exit 1; }
+            echo "make $t refused, as intended"
+          done
+
+      - name: make lint must not claim to be clean
+        run: |
+          set -euo pipefail
+          out=$(make lint 2>&1 || true)
+          grep -q 'lint clean' <<<"$out" && { echo "lint reported clean having linted nothing" >&2; exit 1; }
+          echo "lint did not falsely report clean"
+
+      - name: help and clean still work without the engine
+        run: |
+          make help
+          make clean

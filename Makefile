@@ -136,7 +136,7 @@ check: engine-present
 	@"$(ENGINE)/tests/run-tests.sh"
 
 lint: engine-present
-	@uvx --quiet "$(YAMLLINT)" -c "$(ENGINE)/.yamllint" "$(PAPER_YML)"
+	@uvx --quiet "$(YAMLLINT)" -c "$(ENGINE)/.yamllint" "$(PAPER_YML)" "$(ROOT)/.github/workflows/"
 	@echo "[paper] lint clean"
 
 clean:
