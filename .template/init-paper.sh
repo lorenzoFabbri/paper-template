@@ -124,9 +124,10 @@ if git -C "$ROOT" rev-parse --git-dir >/dev/null 2>&1 && git -C "$ROOT" rev-pars
     # Matched on the repository name, so a fork keeping that name is read as the
     # template. A fork is the author's own, so the match is deliberately narrow:
     # the exact upstream path, not the word anywhere in the URL.
+    # Both separators: HTTPS puts a slash before the owner, SSH a colon.
     origin_url=$(git -C "$ROOT" remote get-url origin 2>/dev/null || true)
     case "${origin_url%.git}" in
-        */lorenzoFabbri/paper-template) drop_origin=1 ;;
+        *[:/]lorenzoFabbri/paper-template) drop_origin=1 ;;
     esac
 fi
 
