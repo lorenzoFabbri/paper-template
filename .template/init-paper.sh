@@ -76,6 +76,26 @@ if git -C "$ROOT" rev-parse --git-dir >/dev/null 2>&1 && git -C "$ROOT" rev-pars
         die "a branch named __paper_init already exists; delete it and try again."
     fi
 
+    # Replacing the history deletes every ref, so anything the author made
+    # themselves would go with the template's. A fresh clone has one branch and
+    # nothing else; more than that means work only they can judge, and this
+    # script is not entitled to weigh it.
+    own_refs=$(git -C "$ROOT" for-each-ref --format='%(refname)' \
+                   refs/heads refs/tags refs/stash \
+                 | { grep -vxF "refs/heads/$branch" || true; })
+    if [[ -n "$own_refs" ]]; then
+        echo "[init] ERROR: this repository holds refs besides '$branch':" >&2
+        while IFS= read -r r; do echo "[init]          $r" >&2; done <<< "$own_refs"
+        echo "[init]        Replacing the history would delete them, and a stash or a" >&2
+        echo "[init]        branch of your own is not the template's to remove." >&2
+        echo "[init]        Delete or merge them yourself, then run init again." >&2
+        exit 2
+    fi
+
+    if [[ -n "$(git -C "$ROOT" status --porcelain --untracked-files=no)" ]]; then
+        die "the working tree has uncommitted changes; commit or discard them first."
+    fi
+
     # The pin has to be reachable from a ref the engine's remote advertises, or
     # `git clone --recurse-submodules` of this paper fails for everyone except
     # this machine — and it will keep building here, so nobody notices. Answered
@@ -99,11 +119,14 @@ if git -C "$ROOT" rev-parse --git-dir >/dev/null 2>&1 && git -C "$ROOT" rev-pars
 
     # Whether origin belongs to the template or to the author decides whether
     # dropping the remotes is a favour or a theft. The URL says; the commit
-    # count does not. The decision is made from origin, and applied to every
-    # remote, since they all came with the template's clone.
+    # count does not.
+    #
+    # Matched on the repository name, so a fork keeping that name is read as the
+    # template. A fork is the author's own, so the match is deliberately narrow:
+    # the exact upstream path, not the word anywhere in the URL.
     origin_url=$(git -C "$ROOT" remote get-url origin 2>/dev/null || true)
-    case "$origin_url" in
-        *paper-template*) drop_origin=1 ;;
+    case "${origin_url%.git}" in
+        */lorenzoFabbri/paper-template) drop_origin=1 ;;
     esac
 fi
 
@@ -199,17 +222,16 @@ YAML
 
 # The clone line names a real repository when one is known. When init has just
 # dropped the template's remote, this paper has no URL yet, and inventing one
-# would be worse than saying so.
+# would be worse than saying so. Each branch carries its own lead-in, so neither
+# leaves a colon introducing the wrong kind of thing.
 if [[ $drop_origin -eq 0 && -n "${origin_url:-}" ]]; then
-    clone_block="\`\`\`sh
+    clone_block="Co-authors clone it with:
+
+\`\`\`sh
 git clone --recurse-submodules $origin_url
 \`\`\`"
 else
-    clone_block="This paper has no remote yet. Once it does, co-authors clone it with:
-
-\`\`\`sh
-git clone --recurse-submodules <this paper's repository URL>
-\`\`\`"
+    clone_block="This paper has no remote yet. Once it has one, co-authors clone it with \\\`git clone --recurse-submodules\\\`, giving that URL."
 fi
 
 # The title is printed, not interpolated: an unquoted heredoc would execute a
@@ -258,13 +280,11 @@ Outputs land in `build/`, which is not tracked.
 
 `engine/` is a git submodule holding the build machinery, pinned to one tagged release. It is not part of this repository beyond the commit it points at, so this paper builds the same way in five years as it does today.
 
-**Co-authors clone with submodules**, or `engine/` arrives empty and every target that needs it refuses to run:
+**Co-authors clone with submodules**, or `engine/` arrives empty and every target that needs it refuses to run. Someone who has already cloned without it can run `git submodule update --init`, and after any `git pull` that moves the pin, `git submodule update --init --recursive` — a plain pull leaves the old engine in place and the paper still builds, silently, against it.
 
 MARKDOWN
     printf '%s\n' "$clone_block"
     cat <<'MARKDOWN'
-
-Someone who has already cloned without it can run `git submodule update --init`.
 
 To move this paper to a newer engine — a deliberate act, never something a build does:
 
@@ -311,11 +331,14 @@ echo "  kept     engine/ at $(git -C "$ROOT/engine" describe --tags 2>/dev/null 
 
 # A clone carries the template's commit history, and with it the record of how
 # the template was written. That belongs to the template, not to the paper.
+#
+# Phase 0 has already refused if any ref but the current branch exists, so what
+# this offers to delete is that branch and its commits, and nothing else.
 if [[ $in_git -eq 1 ]]; then
     commits=$(git -C "$ROOT" rev-list --count HEAD 2>/dev/null || echo 0)
     echo
-    printf '  This repository carries %s commit(s) of the template'"'"'s own history.\n' "$commits"
-    printf '  Replace them with a single commit for this paper? [y/N]: '
+    printf '  Branch %s has %s commit(s), all of them the clone'"'"'s history.\n' "$branch" "$commits"
+    printf '  Replace with a single commit for this paper? This cannot be undone. [y/N]: '
     read -r answer || answer=""
 
     if [[ "${answer:-n}" =~ ^[Yy] ]]; then
@@ -340,22 +363,36 @@ if [[ $in_git -eq 1 ]]; then
                 || die "$f did not reach the commit. Check core.excludesfile."
         done
 
+        # Everything above this line is undoable by the command the trap prints,
+        # and nothing below it is. The message has to change with the fact.
+        trap 'echo "[init] FAILED while replacing the history." >&2
+              echo "[init]        Your paper is committed on __paper_init and the working tree is intact." >&2
+              echo "[init]        The template refs may be partly deleted; finish with:" >&2
+              echo "[init]        git -C \"$ROOT\" branch -M '"'"'$branch'"'"'" >&2' ERR
+
         ############ point of no return: the first ref deletion ############
         if [[ $drop_origin -eq 1 ]]; then
             for r in $(git -C "$ROOT" remote); do
                 git -C "$ROOT" remote remove "$r"
             done
         fi
-        # -M is delete-and-rename in one step, and works whether or not the
-        # branch exists — it will not, if HEAD was detached.
-        git -C "$ROOT" branch -q -M "$branch"
-        # Every other ref, not just the branches and tags: refs/stash, notes,
-        # refs/original and refs/bisect each keep the old history reachable.
-        # --exclude rather than a grep, because a branch name may contain regex
-        # metacharacters and a grep that filters everything returns 1.
-        git -C "$ROOT" for-each-ref --exclude="refs/heads/$branch" \
-            --format='option no-deref%0adelete %(refname)' refs \
+        # Every ref except the one being kept: refs/stash, notes, refs/original
+        # and refs/bisect each hold the old history alive on their own.
+        #
+        # Filtered with grep -vxF rather than for-each-ref --exclude, which
+        # needs git 2.42 — newer than Debian 12 or Ubuntu 22.04 ship. -x -F
+        # matches the whole line literally, so a branch name containing regex
+        # metacharacters is compared as text; `|| true` covers grep's exit 1
+        # when it filters everything out.
+        git -C "$ROOT" for-each-ref --format='%(refname)' refs \
+          | { grep -vxF "refs/heads/__paper_init" || true; } \
+          | awk '{ print "option no-deref"; print "delete " $0 }' \
           | git -C "$ROOT" update-ref --stdin
+
+        # The sweep ran while HEAD was still __paper_init, so the rename is the
+        # last step and cannot leave the branch pointing at deleted refs.
+        git -C "$ROOT" branch -q -M "$branch"
+
         # Not reachability roots — gc prunes the old history with these in place.
         # Removed so none is left printing a sha that no longer resolves.
         gitdir=$(git -C "$ROOT" rev-parse --absolute-git-dir)
@@ -374,8 +411,10 @@ if [[ $in_git -eq 1 ]]; then
     else
         echo "  kept the existing history"
         echo
+        # No title in the suggested command: an apostrophe in it would end the
+        # quoting and hand the reader something that does not run.
         echo "  Still to do: commit the files this just wrote,"
-        echo "               git add -A && git commit -m 'Start $title'"
+        echo "               git add -A && git commit"
         [[ $drop_origin -eq 1 ]] && echo "               and repoint origin, which is still the template's."
     fi
 fi

@@ -36,6 +36,11 @@ CSL_FILE := $(ENGINE)/styles/$(CSL_NAME).csl
 # by the driver, which can test a path containing spaces and make cannot.
 REFERENCE_DOCX := $(ROOT)/reference-doc.docx
 
+# Pinned: unpinned, uvx resolves to whatever is newest, so the same tree
+# passes on one machine and fails on another as default rule sets grow.
+SHELLCHECK := shellcheck-py==0.11.0.1
+YAMLLINT := yamllint@1.38.0
+
 DOCX_MAIN := $(BUILD)/main.docx
 DOCX_SUPP := $(BUILD)/supplement.docx
 PDF := $(BUILD)/main.pdf
@@ -51,6 +56,9 @@ help:
 	@echo "make check      build the engine's test papers and check them against their manuscripts"
 	@echo "make lint       yamllint over paper.yml"
 	@echo "make clean      remove build/"
+	@test -f "$(ROOT)/.template/init-paper.sh" \
+		&& echo "make init       turn this template into your paper (run once, first)" \
+		|| true
 
 # Cloning without --recurse-submodules leaves engine/ an empty directory, and
 # every target below would otherwise fail with a bare "No such file or
@@ -60,10 +68,16 @@ engine-present:
 		echo "[paper] ERROR: engine/ is empty — the engine is a git submodule." >&2; \
 		echo "[paper]        Run: git submodule update --init" >&2; exit 1; }
 
-precheck: engine-present
+# yq reads build.journal and build.csl, so a missing yq surfaces as an empty
+# setting and an error blaming paper.yml. Every target that reads it says so.
+have-yq:
+	@command -v yq >/dev/null || { \
+		echo "[paper] ERROR: yq not on PATH; paper.yml cannot be read." >&2; \
+		echo "[paper]        Install mikefarah/yq v4: https://github.com/mikefarah/yq" >&2; exit 1; }
+
+precheck: engine-present have-yq
 	@test -f "$(PAPER_YML)" || { echo "[paper] ERROR: paper.yml missing" >&2; exit 1; }
 	@test -f "$(MAIN_MD)" || { echo "[paper] ERROR: main.md missing" >&2; exit 1; }
-	@command -v yq >/dev/null || { echo "[paper] ERROR: yq not on PATH" >&2; exit 1; }
 	@yq -e '.build' "$(PAPER_YML)" >/dev/null 2>&1 || { echo "[paper] ERROR: paper.yml has no build: block, or is not valid YAML" >&2; exit 1; }
 	@mkdir -p "$(BUILD)"
 
@@ -99,13 +113,13 @@ pdf: precheck
 		--bibliography "$(REFERENCES_BIB)" --out "$(PDF)"
 	@echo "[paper] $(PDF)"
 
-bib: engine-present
+bib: engine-present have-yq
 	@test -n "$(ZOTERO_COLLECTION)" || { echo "[paper] ERROR: set build.zotero-collection in paper.yml" >&2; exit 1; }
 	@"$(ENGINE)/refresh-bib.sh" "$(ZOTERO_COLLECTION)" "$(REFERENCES_BIB)"
 
 # The journal is checked before the build, so a missing key fails in a second
 # rather than after two pandoc runs.
-submit: engine-present
+submit: engine-present have-yq
 	@test -n "$(JOURNAL)" || { echo "[paper] ERROR: set build.journal in paper.yml" >&2; exit 1; }
 	@test -f "$(ENGINE)/styles/submission-rules/$(JOURNAL).yml" || { echo "[paper] ERROR: no profile for journal '$(JOURNAL)'" >&2; exit 1; }
 	@$(MAKE) --no-print-directory docx
@@ -122,7 +136,7 @@ check: engine-present
 	@"$(ENGINE)/tests/run-tests.sh"
 
 lint: engine-present
-	@uvx --quiet yamllint -c "$(ENGINE)/.yamllint" "$(PAPER_YML)"
+	@uvx --quiet "$(YAMLLINT)" -c "$(ENGINE)/.yamllint" "$(PAPER_YML)"
 	@echo "[paper] lint clean"
 
 clean:
@@ -137,7 +151,7 @@ clean:
 .PHONY: init lint-init
 lint: lint-init
 lint-init:
-	@uvx --quiet --from shellcheck-py shellcheck --shell=bash "$(ROOT)/.template/init-paper.sh"
+	@uvx --quiet --from "$(SHELLCHECK)" shellcheck --shell=bash "$(ROOT)/.template/init-paper.sh"
 init: engine-present
 	@"$(ROOT)/.template/init-paper.sh" "$(ROOT)"
 # <<< template-init

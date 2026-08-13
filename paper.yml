@@ -4,9 +4,12 @@
 # Makefile reads the `build:` block with yq. Everything Pandoc does not
 # recognise it ignores, so build settings and manuscript metadata coexist here
 # rather than being split across a Makefile, a metadata file and the shell.
+#
+# `make init` fills this in from what it asks you. Editing it by hand is the
+# same thing done slower.
 
-title: "A worked example manuscript"
-short-title: "Worked example"
+title: ""
+short-title: ""
 
 # Author keys, all of which are rendered. Normalised by
 # engine/filters/scholarly-metadata.lua, laid out by
@@ -22,33 +25,23 @@ short-title: "Worked example"
 #   orcid              bare iD or full https://orcid.org/ URL, either accepted;
 #                      listed in an ORCID block under the correspondence line
 author:
-  - name: Ada Lovelace
+  - name: ""
     institute: [inst1]
     correspondence: true
-    email: ada@example.org
-    equal_contributor: true
-    orcid: 0000-0002-1825-0097
-  - name: Charles Babbage
-    institute: [inst1, inst2]
-    equal_contributor: true
-    orcid: 0000-0001-9999-000X
-  - name: Grace Hopper
-    institute: [inst2]
-    orcid: 0000-0003-9999-0000
+    email: ""
+    orcid: ""
 
 # Institute keys: `id`, referenced by authors above, and `name`. The numeric
 # superscript index is assigned in declaration order.
 institute:
   - id: inst1
-    name: Department of Analytical Engines, Example University
-  - id: inst2
-    name: Institute of Difference Engines
+    name: ""
 
-keywords: [example, manuscript, template]
+keywords: []
 
 build:
   # Journal key → engine/styles/submission-rules/<journal>.yml. Drives
-  # `make submit`: file naming, word and reference limits, required checklists.
+  # `make submit`: file naming and required checklists.
   journal: aje
 
   # Citation style → engine/styles/<csl>.csl.
@@ -58,17 +51,18 @@ build:
   typst-theme: default
 
   # Better BibTeX collection name, used by `make bib` and `make docx-live`.
-  # Leave empty if you maintain references.bib by hand.
+  # Give the full path from the library root; leave empty if you maintain
+  # references.bib by hand.
   zotero-collection: ""
 
   # Limits for the journal above, copied from its author instructions when you
   # choose it. `make submit` checks the manuscript against them and refuses to
-  # package a paper that exceeds one. Omit a limit to leave it unchecked.
+  # package a paper that exceeds one. Leave a limit empty to skip that check.
   #
   # They live here rather than in the journal profile because a limit read from
   # a publisher's page goes stale, and the person who can tell whether it is
   # still right is the one about to submit.
   limits:
-    abstract: 200
-    main_text: 4000
+    abstract: ~
+    main_text: ~
     references: ~
