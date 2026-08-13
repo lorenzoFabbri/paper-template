@@ -58,12 +58,16 @@ jobs:
       - run: make pdf
       - run: make submit
 
+      # The paper's own files only: engine/ is the other repository, and
+      # .github/ holds this list, so a guard that searched it would match
+      # itself. "95% CI" is deliberately absent — it appears in any real
+      # results sentence and could never distinguish a leak.
       - name: The skeleton carries nothing invented
         run: |
           set -euo pipefail
-          if grep -rIn -E 'Lovelace|Babbage|Hopper|Example University|95% CI' \
-               --include='*.md' --include='*.yml' --include='*.bib' . \
-               | grep -v '^\./engine/' | grep -v '^engine/'; then
+          if grep -rIn -E 'Lovelace|Babbage|Hopper|Example University|Analytical Engines' \
+               --include='*.md' --include='*.yml' --include='*.bib' \
+               --exclude-dir=engine --exclude-dir=.github . ; then
             echo "example content reached the template" >&2
             exit 1
           fi

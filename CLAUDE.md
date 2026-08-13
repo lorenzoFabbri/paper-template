@@ -47,9 +47,11 @@ Both linters are pinned. Unpinned, `uvx` resolves to whatever is newest, and the
 
 `make init` is destructive, removes itself, and can rewrite git history. Test it on a clone. Answers are read from stdin in the order prompted; the last one decides whether to replace the template's history, so `n` keeps it.
 
+**Commit your change before cloning.** Init refuses to run on a dirty tree, so copying the working-tree script over the clone's — which is what a clone of an uncommitted change would need — is exactly what it rejects. Commit, then clone, and the clone carries what you are testing.
+
 ```sh
+git commit -am 'wip'          # init refuses a dirty tree; the clone must carry the change
 rm -rf /tmp/t && git clone --recurse-submodules -q . /tmp/t
-cp .template/init-paper.sh /tmp/t/.template/
 cd /tmp/t && old=$(git rev-parse HEAD)
 ./.template/init-paper.sh /tmp/t <<< $'Title\nShort\nName\nemail\norcid\nAffiliation\naje\nvancouver\ncollection\ny\n'
 ```

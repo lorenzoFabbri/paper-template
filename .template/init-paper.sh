@@ -232,7 +232,7 @@ if [[ $drop_origin -eq 0 && -n "${origin_url:-}" ]]; then
 git clone --recurse-submodules $origin_url
 \`\`\`"
 else
-    clone_block="This paper has no remote yet. Once it has one, co-authors clone it with \\\`git clone --recurse-submodules\\\`, giving that URL."
+    clone_block="This paper has no remote yet. Once it has one, co-authors clone it with \`git clone --recurse-submodules\`, giving that URL."
 fi
 
 # The title is printed, not interpolated: an unquoted heredoc would execute a
@@ -314,7 +314,11 @@ chmod 644 "$tmp.out"
 mv "$tmp.out" "$ROOT/Makefile"
 rm -f "$tmp"
 
-rm -rf "$ROOT/CLAUDE.md" "$ROOT/.claude" "$ROOT/CHANGELOG.md"
+# .github goes too: the workflow tests the template — that `make init` exists
+# and that no example content survives — and a paper has neither. Left behind,
+# it fails on the paper's first push, asserting a target this script just
+# removed. A paper that wants CI wants a different one.
+rm -rf "$ROOT/CLAUDE.md" "$ROOT/.claude" "$ROOT/CHANGELOG.md" "$ROOT/.github"
 
 # Last, and never anything under engine/: deleting a file the engine tracks
 # would leave the submodule permanently modified in every clone. Bash keeps
