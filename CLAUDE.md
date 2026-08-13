@@ -56,7 +56,7 @@ cd /tmp/t && old=$(git rev-parse HEAD)
 ./.template/init-paper.sh /tmp/t <<< $'Title\nShort\nName\nemail\norcid\nAffiliation\naje\nvancouver\ncollection\ny\n'
 ```
 
-Clone rather than copy, and with `--recurse-submodules`, or neither the git branch nor the submodule checks are reached. Copy the working-tree `init-paper.sh` over the clone's, or you are testing the committed version instead of your change.
+Clone rather than copy, and with `--recurse-submodules`, or neither the git branch nor the submodule checks are reached.
 
 Running it proves nothing on its own. Assert:
 
