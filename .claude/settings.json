@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(make:*)",
+      "Bash(pandoc:*)",
+      "Bash(typst:*)",
+      "Bash(yq:*)",
+      "Bash(python3:*)",
+      "Bash(uvx:*)",
+      "Bash(unzip:*)",
+      "Bash(pdftotext:*)",
+      "Bash(pdfinfo:*)",
+      "Bash(xmllint:*)",
+      "Bash(diff:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(./engine/tests/run-tests.sh)",
+      "Bash(./engine/refresh-bib.sh:*)"
+    ]
+  }
+}

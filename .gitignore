@@ -1,0 +1,4 @@
+# Build outputs. Everything here is reproducible from main.md and paper.yml.
+build/
+
+.DS_Store
